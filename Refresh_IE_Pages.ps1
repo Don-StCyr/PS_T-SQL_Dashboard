@@ -1,5 +1,6 @@
 ## Refresh Webpages Every X Seconds
 ## https://stackoverflow.com/questions/25888915/refreshing-web-page-using-powershell
+## Just adding some more info here
 
 "Refreshing IE Windows every $interval seconds."
 "Press any key to stop."
