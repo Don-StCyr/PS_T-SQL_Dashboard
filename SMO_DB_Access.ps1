@@ -1,18 +1,19 @@
 [reflection.assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo")
 ##[reflection.assembly]::LoadWithPartialName("Microsoft.SqlServer.SqlWmiManagement")
 
-$serverName = "RD-STCYR-VM\MSSQLSERVER"
+$serverName = $env:computername + "\MSSQLSERVER"
 $server = New-Object -typeName Microsoft.SqlServer.Management.Smo.Server -argumentList "$serverName"
 
-$server.ConnectionContext.LoginSecure=$false;
-$server.ConnectionContext.set_Login("username")
-$securePassword = ConvertTo-SecureString 'password' -AsPlainText –Force
-$server.ConnectionContext.set_SecurePassword($securePassword)
-$database = "mdb"
+$server.ConnectionContext.LoginSecure=$true;
+## $server.ConnectionContext.LoginSecure=$false;
+## $server.ConnectionContext.set_Login("username")
+## $securePassword = ConvertTo-SecureString 'password' -AsPlainText –Force
+## $server.ConnectionContext.set_SecurePassword($securePassword)
+$database = "master"
 
-$sqlquery = "SELECT DISTINCT z_INPRCO.last_name + `',`' + z_INPRCO.first_name as cust_name, org_name, z_INPRCO.summary, case [z_INPRCO].[type] when `'C`' then CAST`(CO.description as varchar`(5000`)`) else CAST`(IP.description as varchar`(5000`)`) end as `'desc`', con.pri_phone_number, con.alt_phone_number, email_address, z_INPRCO.location_name as loc_name, address_1, address_2, z_INPRCO.city, st.symbol as State_abv ,zip FROM z_INPRCO INNER JOIN ca_location loc on z_INPRCO.location_name = loc.location_name INNER JOIN ca_contact con on z_INPRCO.customer = con.contact_uuid INNER JOIN ca_state_province st on [loc].[state]=st.id LEFT JOIN call_req IP on z_INPRCO.ticket = IP.ref_num LEFT JOIN chg CO on z_INPRCO.ticket = CO.chg_ref_num WHERE ticket = $ticketnumber AND loc.inactive <>1"
+$sqlquery = "SELECT name FROM sys.databases"
 
-$db = new-object ("Microsoft.sqlServer.Management.Smo.Database") ($server, "mdb")
+$db = new-object ("Microsoft.sqlServer.Management.Smo.Database") ($server, "master")
 $ds = $db.ExecuteWithResults($sqlquery)
 
 #####
@@ -25,16 +26,25 @@ $ds = $db.ExecuteWithResults($sqlquery)
 # Required for SQL Server 2008 (SMO 10.0).
 [void][System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMOExtended');
 
-
-$server =  New-Object Microsoft.SqlServer.Management.Smo.Server "RD-STCYR-VM";
+$serverName = $env:computername ## + "\MSSQLSERVER"
+$server =  New-Object Microsoft.SqlServer.Management.Smo.Server $serverName; ##"RD-STCYR-VM";
 $db = $server.Databases.Item("master");
 
-[String] $sql = "SELECT * FROM [sys].[databases] ORDER BY [name];";
+## [String] $sql = "SELECT name FROM [sys].[databases] ORDER BY [name];";
+[String] $sql = "SELECT UPPER(DB_NAME(database_id)) AS DatabaseName, type_desc AS FileType,
+		(SUM(size)*8)/(1024)  AS DBSizeMB, --CAST((SUM(max_size)*8)/(1024.0) AS decimal(10,2)) AS MaxDBSizeMB,
+		physical_name, state_desc, (SUM(max_size)
+FROM sys.master_files
+GROUP BY database_id, type_desc, physical_name, state_desc, max_size
+ORDER BY DB_NAME(database_id), type_desc;";
 $result = $db.ExecuteWithResults($sql);
-$table = $result.Tables[0];
+$table = $result.Tables[0] | Select -ExpandProperty name
+## ;
 
-$sql2 = "SELECT $dbs(dbid) AS DatabaseName FROM sys.files "
+## $sql2 = "SELECT $dbs(dbid) AS DatabaseName FROM sys.files "
 foreach ($dbs in $table)
 {
-    Write-Host $db.ExecuteWithResults($sql)
+    Write-Host "These are the databases: " + $dbs 
+    ##$db.ExecuteWithResults($sql)
 }
+
